@@ -1,0 +1,26 @@
+{
+    "name": "location-container",
+    "dockerComposeFile": "docker-compose.yml",
+    "service": "location-service",
+    "workspaceFolder": "/home/Elaina/location",
+    "shutdownAction": "stopCompose",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "llvm-vs-code-extensions.vscode-clangd",
+                "twxs.cmake",
+                "josetr.cmake-language-support-vscode",
+                "ms-vscode.cmake-tools",
+                "cschlosser.doxdocgen",
+                "augustocdias.tasks-shell-input",
+                "ms-vscode.cpptools",
+                "ms-python.python",
+                "ms-iot.vscode-ros",
+                "njpwerner.autodocstring"
+            ]
+        },
+        "jetbrains": {
+            "extensions": []
+        }
+    }
+}
