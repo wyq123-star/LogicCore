@@ -21,9 +21,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_auto REQUIRED)
 find_package(Eigen3 REQUIRED)
 ament_auto_find_build_dependencies()
-set (ImuTransform "ImuTransform")
-ament_auto_add_library(${ImuTransform} SHARED src/imu_transform.cpp)
-target_link_libraries(${ImuTransform} Eigen3::Eigen)
+
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -40,10 +38,7 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
-rclcpp_components_register_node(${ImuTransform}
-  PLUGIN "ImuTransform"
-  EXECUTABLE ${ImuTransform}_node
-)
+
 install(
   DIRECTORY launch config
   DESTINATION share/${PROJECT_NAME}
