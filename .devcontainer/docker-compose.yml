@@ -1,7 +1,7 @@
 version: '3.9'
 services:
   visual-service:
-    image: elainasuki/rc2025:visual-2025
+    image: elainasuki/rc2025:visual_2025_jazzy
     container_name: visual-container
     environment:
       - DISPLAY=${DISPLAY}
