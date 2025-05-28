@@ -1,4 +1,4 @@
-FROM elainasuki/ros:ros2-jazzy-full-official
+FROM elainasuki/ros:ros2-jazzy-full
 
 # 定义用户和用户组
 ARG USERNAME=Elaina
