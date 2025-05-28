@@ -304,23 +304,6 @@ global_costmap:
           raytrace_min_range: 0.2
           clearing: True
           marking: True
-      # obstacle_layer: # 启用的地图层级，按顺序叠加（静态层 → 障碍层 → 膨胀层）但不需要障碍层似乎
-      #   plugin: "nav2_costmap_2d::ObstacleLayer"
-      #   enabled: true #  启用障碍物层
-      #   observation_sources: scan # 障碍物检测的数据源
-      #   # combination_method: 0        # 覆盖模式，新数据直接替换旧数据
-      #   # observation_persistence: 0.0 # 数据保留时间为0秒
-      #   scan:
-      #     topic: /laser/sd/raw
-      #     max_obstacle_height: 2.0
-      #     clearing: True # 清除激光路径上的自由区域
-      #     marking: True # 标记激光点云中的障碍物
-      #     data_type: "LaserScan"
-      #     raytrace_max_range: 3.0
-      #     raytrace_min_range: 0.0
-      #     obstacle_max_range: 3.0 # 有效障碍物检测最大距离2.5米
-      #     obstacle_min_range: 0.0
-
       static_layer:  # 静态地图层
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
@@ -356,40 +339,6 @@ planner_server:
       tolerance: 0.5 # 目标点容差0.5米，允许规划路径终点在此范围内
       use_astar: true # ！！！！是否启动A*算法，若false则启动Dijkstra算法，A*快速响应动态障碍，适合人员流动频繁的区域
       allow_unknown: true # 允许在位置区域通行
-
-# planner_server:
-#   ros__parameters:
-#     expected_planner_frequency: 20.0
-#     use_sim_time: True
-#     planner_plugins: ["SmacHybrid"]  # 使用 Smac 混合A*规划器
-#     SmacHybrid:
-#       plugin: "nav2_smac_planner/SmacPlannerHybrid"
-#       # ==== 核心参数 ====
-#       cache_obstacle_heuristic: True  # 启用障碍物启发式缓存[1,7](@ref)
-#       allow_unknown: True             # 允许在未知区域搜索
-#       motion_model_for_search: "REEDS_SHEPP"  # 运动模型（可选 DUBIN/REEDS_SHEPP）
-#       max_iterations: 1000000         # 最大迭代次数
-#       max_planning_time: 5.0          # 最大规划时间（秒）
-#       analytic_expansion_max_length: 3.0  # 分析扩展的最大路径长度
-#       # ==== 运动学参数 ====
-#       minimum_turning_radius: 0.5      # 最小转弯半径（米）
-#       reverse_penalty: 2.1            # 倒车惩罚系数
-#       change_penalty: 0.15            # 方向变化惩罚系数
-#       non_straight_penalty: 1.1       # 非直线运动惩罚系数
-#       cost_penalty: 2.0               # 代价惩罚系数
-#       # ==== 启发式优化 ====
-#       lookup_table_size: 20.0         # 预计算距离窗口大小（米）[1](@ref)
-#       angle_quantization_bins: 72     # SE2 搜索角度格网数（5度/格）
-
-# smoother_server:
-#   ros__parameters:
-#     use_sim_time: false
-#     smoother_plugins: ["simple_smoother"]
-#     simple_smoother:
-#       plugin: "nav2_smoother::SimpleSmoother"
-#       tolerance: 1.0e-10
-#       max_its: 1000
-#       do_refinement: True
 smoother_server:
   ros__parameters:
     use_sim_time: True
@@ -470,3 +419,17 @@ waypoint_follower:
       plugin: "nav2_waypoint_follower::WaitAtWaypoint"
       enabled: True
       waypoint_pause_duration: 200
+velocity_smoother:
+  ros__parameters:
+    use_sim_time: True
+    smoothing_frequency: 20.0
+    scale_velocities: False
+    feedback: "OPEN_LOOP"
+    max_velocity: [3.0, 3.0, 4.0] # 最大速度限制
+    min_velocity: [-3.0, -3.0, -4.0] # 最小速度限制
+    max_accel: [2.0, 2.0, 2.0] # 最大加速度限制
+    max_decel: [-2.0, -2.0, -2.0]
+    odom_topic: "odom"
+    odom_duration: 0.1 # 里程计数据的有效期0.1秒
+    deadband_velocity: [0.0, 0.0, 0.0] # 速度死区，忽略微小速度指令
+    velocity_timeout: 1.0
