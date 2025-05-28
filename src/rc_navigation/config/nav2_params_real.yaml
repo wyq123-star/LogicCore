@@ -12,7 +12,7 @@ bt_navigator:
       plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
     navigate_through_poses:
       plugin: "nav2_bt_navigator::NavigateThroughPosesNavigator"
-    # default_nav_to_pose_bt_xml: /home/Elaina/visual/src/rc_navigation/bt_tree/simple_bt.xml
+    default_nav_to_pose_bt_xml: /home/Elaina/visual/src/rc_navigation/bt_tree/simple_bt.xml
     # 'default_nav_through_poses_bt_xml' and 'default_nav_to_pose_bt_xml' are use defaults:
     # nav2_bt_navigator/navigate_to_pose_w_replanning_and_recovery.xml
     # nav2_bt_navigator/navigate_through_poses_w_replanning_and_recovery.xml
@@ -170,7 +170,7 @@ local_costmap:
       robot_radius: 0.22   # 机器人碰撞半径22cm
       plugins: ["obstacle_layer", "inflation_layer"] # 激活的层级
       obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayerUltra"
+        plugin: "nav2_costmap_2d::ObstacleLayer"
         # plugin: "costmap_intensity::ObstacleLayerIntensity"
         enabled: True
         observation_sources: scan # 数据源名称
@@ -240,7 +240,7 @@ global_costmap:
       track_unknown_space: true # 将未知区域视为可通行区域
       plugins: ["static_layer", "obstacle_layer","inflation_layer"]
       obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayerUltra"
+        plugin: "nav2_costmap_2d::ObstacleLayer"
         # plugin: "costmap_intensity::ObstacleLayerIntensity"
         enabled: True
         combination_method: 1
