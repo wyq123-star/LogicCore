@@ -66,6 +66,14 @@
       ]
     },
     {
+      "name": "GDB Launch",
+      "MIMode": "gdb",
+      "type": "cppdbg",
+      "request": "attach",
+      "program": "${workspaceFolder}/.vscode/start_program",
+      "miDebuggerPath": "/usr/bin/gdb"
+    },
+    {
       "name": "C/C++ Runner: Debug Session",
       "type": "cppdbg",
       "request": "launch",

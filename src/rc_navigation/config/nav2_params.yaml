@@ -200,8 +200,8 @@ controller_server:
 local_costmap:
   local_costmap:
     ros__parameters:
-      update_frequency: 20.0  # 代价地图更新频率(Hz)
-      publish_frequency: 20.0 # 地图数据发布频率(Hz)
+      update_frequency: 10.0  # 代价地图更新频率(Hz)
+      publish_frequency: 10.0 # 地图数据发布频率(Hz)
       global_frame: odom     # 全局坐标系（使用里程计坐标系）
       robot_base_frame: base_link  # 机器人本体坐标系
       use_sim_time: True     # 使用仿真时间
@@ -217,55 +217,17 @@ local_costmap:
         enabled: True
         combination_method: 0
         observation_sources: scan # 数据源名称
-        max_obstacle_intensity: 2.0
-        min_obstacle_intensity: 0.2
         scan:
           topic: /laser/sd/raw
           sensor_frame: laser_link # 激光传感器坐标系
-          clearing: True # 清除激光路径上的自由区域 
-          marking: True # 标记激光点云中的障碍物
-          data_type: "LaserScan"
-          max_obstacle_height: 2.0
-          min_obstacle_height: -2.0
-          obstacle_max_range: 20.0
+          obstacle_max_range: 7.0
           obstacle_min_range: 0.2
-          raytrace_max_range: 20.0
-          raytrace_min_range: 0.2
-          clearing: True
-          marking: True
 
       inflation_layer:   # 膨胀层
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: True
-        cost_scaling_factor: 2.0
+        cost_scaling_factor: 7.0
         inflation_radius: 0.8                          
-
-      # voxel_layer:  # 3D体素层
-      #   plugin: "nav2_costmap_2d::VoxelLayer"
-      #   enabled: false # 启用该层
-      #   publish_voxel_map: True # 发布3D体素地图
-      #   origin_z: 0.0      # Z轴原点
-      #   z_resolution: 0.05 # 垂直分辨率5cm
-      #   z_voxels: 16  # 垂直方向体素数（16×0.05=0.8米高度）
-      #   max_obstacle_height: 2.0  # 最大障碍物高度2米
-      #   mark_threshold: 0  # 体素标记阈值（0表示1个点即标记）
-      #   observation_sources: scan # 数据源名称
-      #   scan:
-      #     topic: /laser/sd/raw # 激光话题
-      #     max_obstacle_height: 2.0 # 数据类型（实际为2D扫描）
-      #     clearing: True # 用于标记障碍物
-      #     marking: True # 用于清除空闲区域
-      #     data_type: "LaserScan"
-      #     raytrace_max_range: 3.0 # 光线追踪最大距离3米
-      #     raytrace_min_range: 0.0
-      #     obstacle_max_range: 2.5 # 有效障碍检测最大距离2.5米
-      #     obstacle_min_range: 0.0
-##=================新增2d障碍层=====================
-
-
-      # static_layer:
-      #   plugin: "nav2_costmap_2d::StaticLayer"
-      #   map_subscribe_transient_local: false # 使用临时本地订阅
       always_send_full_costmap: True # 始终发布完整地图
 
 global_costmap:
@@ -292,17 +254,10 @@ global_costmap:
         scan:
           topic: /laser/sd/raw
           sensor_frame: laser_link # 激光传感器坐标系
-          clearing: True # 清除激光路径上的自由区域 
-          marking: True # 标记激光点云中的障碍物
           data_type: "LaserScan"
-          max_obstacle_height: 2.0
-          min_obstacle_height: -2.0
-          obstacle_max_range: 20.0
+          obstacle_max_range: 2.0
           obstacle_min_range: 0.2
-          raytrace_max_range: 20.0
-          raytrace_min_range: 0.2
-          clearing: True
-          marking: True
+
       # obstacle_layer: # 启用的地图层级，按顺序叠加（静态层 → 障碍层 → 膨胀层）但不需要障碍层似乎
       #   plugin: "nav2_costmap_2d::ObstacleLayer"
       #   enabled: true #  启用障碍物层
