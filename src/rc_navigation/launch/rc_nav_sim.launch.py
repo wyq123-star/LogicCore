@@ -31,7 +31,7 @@ def generate_launch_description():
                           }.items()
     )
     #======================================启动地图服务
-    map_path=os.path.join(my_packager_share_dir,'map','court_map.yaml')
+    map_path=os.path.join(my_packager_share_dir,'map','court_map_sim.yaml')
     # map_path=os.path.join(my_packager_share_dir,'map','empty_map.yaml')
     ld.add_action(DeclareLaunchArgument('map', default_value=map_path, description='Full path to map yaml file to load'))
     map_server_launch=IncludeLaunchDescription(

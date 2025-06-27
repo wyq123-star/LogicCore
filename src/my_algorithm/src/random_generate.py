@@ -4,6 +4,7 @@ from rclpy.node import Node
 import random
 import math
 import time
+from rcl_interfaces.msg import IntegerRange  # 新增导入
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import PoseStamped, Point, PoseArray, Pose
 from std_msgs.msg import Header
@@ -86,7 +87,30 @@ class RandomPointGenerator(Node):
                 type=ParameterType.PARAMETER_DOUBLE
             )
         )
+        # 坐标精度参数：配合电控
+        self.declare_parameter(
+            'coordinate_precision', 'high',
+            ParameterDescriptor(
+                description='坐标精度: high=高精度浮点, low=低精度小数点后一位',
+                type=ParameterType.PARAMETER_STRING,
+                read_only=False,
+                additional_constraints="Allowed values: ['high', 'low']"
+            )
+        )
         
+        # 新增：小数点位数参数 (0-5位)
+        self.declare_parameter(
+            'decimal_places', 1,
+            ParameterDescriptor(
+                description='低精度模式下的小数点位数 (0=整数精度, 1-5=小数点后位数)',
+                type=ParameterType.PARAMETER_INTEGER,
+                integer_range=[IntegerRange(  # 使用IntegerRange对象
+                    from_value=0,
+                    to_value=5,
+                    step=1
+                )]
+            )
+        )
         # 创建候选点发布器
         self.points_pub = self.create_publisher(
             PoseArray,
@@ -133,7 +157,8 @@ class RandomPointGenerator(Node):
             # 当圆心、半径或发布模式变化时重新生成点
             if param_name in ['center_x', 'center_y', 'radius_min', 'radius_max', 
                              'num_points', 'publish_mode', 'origin_x', 'origin_y', 
-                             'half_circle', 'safety_distance', 'map_x', 'map_y']:
+                             'half_circle', 'safety_distance', 'map_x', 'map_y',
+                             'coordinate_precision', 'decimal_places']:  # 添加新参数到触发条件
                 self.get_logger().info(
                     f"参数更新: {param_name} = {param.value}"
                 )
@@ -260,6 +285,17 @@ class RandomPointGenerator(Node):
 
     def generate_candidate_points(self):
         """在圆环区域内生成均匀分布的候选点（可选择半圆环）"""
+        # 获取坐标精度模式
+        precision_mode = self.get_parameter('coordinate_precision').value
+        
+        # 根据精度模式选择生成方法
+        if precision_mode == 'high':
+            self.generate_high_precision_points()
+        else:  # 低精度模式
+            self.generate_low_precision_points()
+    
+    def generate_high_precision_points(self):
+        """高精度浮点生成方法（原始逻辑）"""
         # 获取动态参数值
         center_x = self.get_parameter('center_x').value
         center_y = self.get_parameter('center_y').value
@@ -298,7 +334,7 @@ class RandomPointGenerator(Node):
             # 在半径范围内随机选择半径
             radius = random.uniform(radius_min, radius_max)
             
-            # 计算点的坐标
+            # 计算点的坐标（高精度浮点）
             x = center_x + radius * math.cos(angle)
             y = center_y + radius * math.sin(angle)
             
@@ -310,7 +346,70 @@ class RandomPointGenerator(Node):
         # 如果有效点不足，记录警告
         if len(self.candidate_points) < num_points:
             self.get_logger().warn(
-                f"仅生成 {len(self.candidate_points)}/{num_points} 个有效点（安全距离: {safety_distance}m）"
+                f"高精度模式仅生成 {len(self.candidate_points)}/{num_points} 个有效点（安全距离: {safety_distance}m）"
+            )
+    
+    def generate_low_precision_points(self):
+        """独立低精度生成方法（动态小数点位数控制）"""
+        # 获取动态参数值
+        center_x = self.get_parameter('center_x').value
+        center_y = self.get_parameter('center_y').value
+        radius_min = self.get_parameter('radius_min').value
+        radius_max = self.get_parameter('radius_max').value
+        num_points = self.get_parameter('num_points').value
+        half_circle = self.get_parameter('half_circle').value
+        safety_distance = self.get_parameter('safety_distance').value
+        decimal_places = self.get_parameter('decimal_places').value  # 获取小数点位数参数
+        
+        # 计算精度步长（基于小数点位数）
+        precision_step = 10 ** (-decimal_places)  # 如decimal_places=2 -> 0.01
+        
+        # 清空候选点列表
+        self.candidate_points = []
+        
+        # 计算角度范围（半圆环或全圆环）
+        if half_circle:
+            # 半圆环模式：180度范围（π弧度）
+            start_angle = self.base_angle - math.pi/2
+            end_angle = self.base_angle + math.pi/2
+            angle_range = math.pi
+        else:
+            # 全圆环模式：360度范围（2π弧度）
+            start_angle = 0
+            end_angle = 2 * math.pi
+            angle_range = 2 * math.pi
+        
+        # 在圆环区域内均匀生成点
+        valid_points = 0
+        max_attempts = num_points * 5  # 最大尝试次数
+        
+        for attempt in range(max_attempts):
+            if valid_points >= num_points:
+                break
+                
+            # 计算角度（均匀分布）
+            angle = start_angle + (valid_points / num_points) * angle_range
+            
+            # 在半径范围内生成指定精度的半径
+            # 计算可用的离散半径数量
+            radius_steps = int((radius_max - radius_min) / precision_step) + 1
+            step_idx = random.randint(0, radius_steps - 1)
+            radius = round(radius_min + step_idx * precision_step, decimal_places)
+            
+            # 计算点的坐标（应用指定精度）
+            x = round(center_x + radius * math.cos(angle), decimal_places)
+            y = round(center_y + radius * math.sin(angle), decimal_places)
+            
+            # 检查点是否在安全矩形内
+            if self.is_point_in_safe_rectangle(x, y):
+                self.candidate_points.append((x, y))
+                valid_points += 1
+        
+        # 如果有效点不足，记录警告
+        if len(self.candidate_points) < num_points:
+            self.get_logger().warn(
+                f"低精度模式仅生成 {len(self.candidate_points)}/{num_points} 个有效点"
+                f"（精度: 小数点后{decimal_places}位, 安全距离: {safety_distance}m）"
             )
     
     def publish_candidate_points(self):
@@ -323,6 +422,13 @@ class RandomPointGenerator(Node):
             stamp=self.get_clock().now().to_msg(),
             frame_id="map"
         )
+        
+        # 获取当前精度模式用于日志
+        precision_mode = self.get_parameter('coordinate_precision').value
+        precision_info = "高精度" if precision_mode == 'high' else "低精度"
+        
+        # 获取小数点位数
+        decimal_places = self.get_parameter('decimal_places').value
         
         for point in self.candidate_points:
             pose = Pose()
@@ -348,8 +454,14 @@ class RandomPointGenerator(Node):
         
         # 定期记录日志（每10次发布记录一次）
         if self.publish_counter % 10 == 0:
+            precision_detail = ""
+            if precision_mode == 'low':
+                precision_detail = f"(小数点后{decimal_places}位)"
+            
             self.get_logger().info(
-                f"已发布 {self.publish_counter} 次候选点 ({mode_info}模式, {circle_info}, 安全距离: {safety_distance}m)"
+                f"已发布 {self.publish_counter} 次候选点 "
+                f"({mode_info}模式, {circle_info}, {precision_info}{precision_detail}, "
+                f"安全距离: {safety_distance}m)"
             )
 
 def main(args=None):

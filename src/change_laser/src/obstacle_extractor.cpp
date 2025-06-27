@@ -4,8 +4,7 @@
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <rclcpp/rclcpp.hpp>
 
-// 定义障碍物阈值
-static constexpr int8_t OBSTACLE_THRESHOLD = 65; // 通常 >65 视为障碍物
+static constexpr int8_t OBSTACLE_THRESHOLD = 65; // 障碍物阈值
 
 class ObstacleExtractor : public rclcpp::Node
 {
@@ -13,18 +12,20 @@ public:
     ObstacleExtractor()
         : Node("obstacle_extractor"), clear_count_(0)
     {
-        // 1. 动态参数声明
+        // 声明动态参数（含区域过滤参数）
         this->declare_parameter("costmap_topic", "/local_costmap/costmap");
+        this->declare_parameter("region_origin_x", 0.0); // 区域原点X
+        this->declare_parameter("region_origin_y", 0.0); // 区域原点Y
+        this->declare_parameter("region_xlength", 14.5); // X方向长度（可正可负）
+        this->declare_parameter("region_ylength", -7.0); // Y方向长度（可正可负）
         update_parameters();
 
-        // 2. 初始化订阅器
+        // 初始化订阅器和发布器
         recreate_subscription();
-
-        // 3. 障碍点发布器
         obstacle_pub_ = this->create_publisher<geometry_msgs::msg::PoseArray>(
             "/global_obstacles", 10);
 
-        // 4. 注册参数回调
+        // 注册参数回调
         param_callback_ = this->add_on_set_parameters_callback(
             std::bind(&ObstacleExtractor::param_callback, this, std::placeholders::_1));
 
@@ -35,22 +36,29 @@ private:
     void update_parameters()
     {
         costmap_topic_ = this->get_parameter("costmap_topic").as_string();
+        region_origin_x_ = this->get_parameter("region_origin_x").as_double();
+        region_origin_y_ = this->get_parameter("region_origin_y").as_double();
+        region_xlength_ = this->get_parameter("region_xlength").as_double();
+        region_ylength_ = this->get_parameter("region_ylength").as_double();
+
+        recreate_subscription();
     }
 
     void recreate_subscription()
     {
+        if (costmap_sub_)
+        {
+            costmap_sub_.reset(); // 先释放旧订阅
+        }
         costmap_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
             costmap_topic_, 10,
-            [this](const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
-            {
-                costmap_callback(msg);
-            });
+            std::bind(&ObstacleExtractor::costmap_callback, this, std::placeholders::_1));
     }
 
     void costmap_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
     {
         geometry_msgs::msg::PoseArray obstacles;
-        obstacles.header = msg->header; // 继承全局坐标系
+        obstacles.header = msg->header;
 
         const auto &data = msg->data;
         const double res = msg->info.resolution;
@@ -59,102 +67,152 @@ private:
         const uint32_t width = msg->info.width;
         const uint32_t height = msg->info.height;
 
-        // 障碍物检测
+        // 根据参数计算有效的矩形区域 [支持负值区域]-----------------
+        const double region_x_min = (region_xlength_ >= 0) ? region_origin_x_ : region_origin_x_ + region_xlength_;
+        const double region_x_max = (region_xlength_ >= 0) ? region_origin_x_ + region_xlength_ : region_origin_x_;
+        const double region_y_min = (region_ylength_ >= 0) ? region_origin_y_ : region_origin_y_ + region_ylength_;
+        const double region_y_max = (region_ylength_ >= 0) ? region_origin_y_ + region_ylength_ : region_origin_y_;
+        // -----------------------------------------------------
+
         bool has_obstacles = false;
         for (uint32_t idx = 0; idx < data.size(); ++idx)
         {
             if (data[idx] > OBSTACLE_THRESHOLD && data[idx] != -1)
             {
-                const uint32_t i = idx / width;
-                const uint32_t j = idx % width;
+                const uint32_t i = idx / width; // 行索引
+                const uint32_t j = idx % width; // 列索引
 
-                geometry_msgs::msg::Pose p;
-                p.position.x = ox + (j + 0.5) * res;
-                p.position.y = oy + (i + 0.5) * res;
-                obstacles.poses.push_back(p);
-                has_obstacles = true;
+                // 计算地图坐标系下的坐标
+                const double x = ox + (j + 0.5) * res;
+                const double y = oy + (i + 0.5) * res;
+
+                // 区域过滤检查 [支持任意方向矩形区域]
+                if (x >= region_x_min && x <= region_x_max &&
+                    y >= region_y_min && y <= region_y_max)
+                {
+                    geometry_msgs::msg::Pose p;
+                    p.position.x = x;
+                    p.position.y = y;
+                    obstacles.poses.push_back(p);
+                    has_obstacles = true;
+                }
             }
         }
 
-        // ==== 新增逻辑：障碍物消失计数 ====
+        // 障碍物计数与发布逻辑
         if (has_obstacles)
         {
-            // 检测到障碍物，重置计数器
             clear_count_ = 0;
             obstacle_pub_->publish(obstacles);
-            RCLCPP_INFO(this->get_logger(), "发布 %ld 个障碍点", obstacles.poses.size());
+            RCLCPP_INFO(this->get_logger(), "发布 %ld 个障碍点 | 区域: (%.2f,%.2f)~(%.2f,%.2f)",
+                        obstacles.poses.size(), region_x_min, region_y_min,
+                        region_x_max, region_y_max);
+            print_obstacle_info(obstacles, res, width, height);
         }
         else
         {
-            // 无障碍物，增加计数
-            clear_count_++;
-
-            if (clear_count_ >= 5)
+            if (++clear_count_ >= 5)
             {
-                // 连续5次无障碍物，发布空集合并重置计数器
                 geometry_msgs::msg::PoseArray empty_obstacles;
                 empty_obstacles.header.stamp = this->now();
                 empty_obstacles.header.frame_id = msg->header.frame_id;
                 obstacle_pub_->publish(empty_obstacles);
-                RCLCPP_INFO(this->get_logger(), "连续5次未检测到障碍物，已清空障碍点");
-                clear_count_ = 0; // 重置计数器
+                RCLCPP_WARN(this->get_logger(), "连续5次未检测到障碍物，已清空障碍点");
+                clear_count_ = 0;
             }
             else
             {
                 RCLCPP_WARN(this->get_logger(), "未检测到障碍物 (%d/5)", clear_count_);
             }
         }
-
-        // 打印障碍点信息（只在有障碍物时显示）
-        if (has_obstacles)
-        {
-            print_obstacle_info(obstacles, res, width, height);
-        }
     }
 
-    // 打印障碍点详细信息
     void print_obstacle_info(const geometry_msgs::msg::PoseArray &obstacles,
                              double resolution, uint32_t width, uint32_t height)
     {
-        RCLCPP_INFO(this->get_logger(), "==============================");
-        RCLCPP_INFO(this->get_logger(), "检测到 %ld 个障碍点", obstacles.poses.size());
-        RCLCPP_INFO(this->get_logger(), "代价地图尺寸: %u x %u (%.2f m x %.2f m)",
-                    width, height, width * resolution, height * resolution);
-        RCLCPP_INFO(this->get_logger(), "分辨率: %.3f m", resolution);
+        RCLCPP_DEBUG(this->get_logger(), "==============================");
+        RCLCPP_DEBUG(this->get_logger(), "检测到 %ld 个障碍点", obstacles.poses.size());
+        RCLCPP_DEBUG(this->get_logger(), "代价地图尺寸: %u x %u (%.2f m x %.2f m)",
+                     width, height, width * resolution, height * resolution);
 
-        size_t print_count = std::min(static_cast<size_t>(5), obstacles.poses.size());
-        for (size_t i = 0; i < print_count; ++i)
+        // 仅当障碍点较少时打印详细信息
+        if (obstacles.poses.size() <= 20)
         {
-            const auto &pose = obstacles.poses[i];
-            RCLCPP_INFO(this->get_logger(), "障碍点 %zu: (%.2f, %.2f)",
-                        i + 1, pose.position.x, pose.position.y);
+            for (size_t i = 0; i < obstacles.poses.size(); ++i)
+            {
+                const auto &pose = obstacles.poses[i];
+                RCLCPP_DEBUG(this->get_logger(), "障碍点 %zu: (%.2f, %.2f)",
+                             i + 1, pose.position.x, pose.position.y);
+            }
         }
-
-        if (obstacles.poses.size() > print_count)
-        {
-            RCLCPP_INFO(this->get_logger(), "... 还有 %ld 个障碍点未显示",
-                        obstacles.poses.size() - print_count);
-        }
-
-        RCLCPP_INFO(this->get_logger(), "==============================");
+        RCLCPP_DEBUG(this->get_logger(), "==============================");
     }
 
-    // 动态参数回调
+    // 参数回调函数（支持动态更新区域）
     rcl_interfaces::msg::SetParametersResult param_callback(
         const std::vector<rclcpp::Parameter> &params)
     {
         auto result = rcl_interfaces::msg::SetParametersResult();
         result.successful = true;
 
+        bool need_update_sub = false;
+        bool need_log_region = false;
+
         for (const auto &param : params)
         {
             if (param.get_name() == "costmap_topic")
             {
                 costmap_topic_ = param.as_string();
-                recreate_subscription();
-                RCLCPP_INFO(this->get_logger(), "切换话题至: %s", costmap_topic_.c_str());
+                need_update_sub = true;
+                RCLCPP_INFO(this->get_logger(), "更新话题: %s", costmap_topic_.c_str());
+            }
+            else if (param.get_name() == "region_origin_x")
+            {
+                region_origin_x_ = param.as_double();
+                need_log_region = true;
+                RCLCPP_INFO(this->get_logger(), "更新区域原点X: %.2f", region_origin_x_);
+            }
+            else if (param.get_name() == "region_origin_y")
+            {
+                region_origin_y_ = param.as_double();
+                need_log_region = true;
+                RCLCPP_INFO(this->get_logger(), "更新区域原点Y: %.2f", region_origin_y_);
+            }
+            else if (param.get_name() == "region_xlength")
+            {
+                region_xlength_ = param.as_double();
+                need_log_region = true;
+                RCLCPP_INFO(this->get_logger(), "更新X长度: %.2f (方向: %s)",
+                            region_xlength_,
+                            (region_xlength_ >= 0) ? "正方向" : "负方向");
+            }
+            else if (param.get_name() == "region_ylength")
+            {
+                region_ylength_ = param.as_double();
+                need_log_region = true;
+                RCLCPP_INFO(this->get_logger(), "更新Y长度: %.2f (方向: %s)",
+                            region_ylength_,
+                            (region_ylength_ >= 0) ? "正方向" : "负方向");
             }
         }
+
+        // 更新后打印区域信息
+        if (need_log_region)
+        {
+            const double x_min = (region_xlength_ >= 0) ? region_origin_x_ : region_origin_x_ + region_xlength_;
+            const double x_max = (region_xlength_ >= 0) ? region_origin_x_ + region_xlength_ : region_origin_x_;
+            const double y_min = (region_ylength_ >= 0) ? region_origin_y_ : region_origin_y_ + region_ylength_;
+            const double y_max = (region_ylength_ >= 0) ? region_origin_y_ + region_ylength_ : region_origin_y_;
+
+            RCLCPP_INFO(this->get_logger(), "当前有效区域: X(%.2f ~ %.2f), Y(%.2f ~ %.2f)",
+                        x_min, x_max, y_min, y_max);
+        }
+
+        if (need_update_sub)
+        {
+            recreate_subscription();
+        }
+
         return result;
     }
 
@@ -163,7 +221,13 @@ private:
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr costmap_sub_;
     rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr obstacle_pub_;
     rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_callback_;
-    int clear_count_; // 新增：障碍物消失计数器
+    int clear_count_;
+
+    // 区域过滤参数 (支持负值)
+    double region_origin_x_;
+    double region_origin_y_;
+    double region_xlength_; // 可正可负，表示延伸方向和长度
+    double region_ylength_; // 可正可负，表示延伸方向和长度
 };
 
 int main(int argc, char **argv)

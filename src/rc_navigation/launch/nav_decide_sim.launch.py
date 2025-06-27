@@ -10,7 +10,7 @@ def generate_launch_description():
     config_file_path = PathJoinSubstitution([
         FindPackageShare('rc_navigation'),
         'config',  
-        'nav_decide_real.yaml'
+        'nav_decide_sim.yaml'
     ])
     
     config_path_arg = DeclareLaunchArgument(
