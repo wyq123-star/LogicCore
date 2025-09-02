@@ -28,6 +28,10 @@
     a: 1.0 # 障碍物评分参数
     b: 1.0 # 角度评分参数
     c: 1.0 # 半径匹配评分参数
+    d: 1.0 # 机器人距离评分参数
+    map_frame: map
+    robot_frame: base_link
+    dist_decay: 1.5    # 衰减因子，值尽可能小于5,值越大，稍远距离的点得分衰减越快
     max_diff: 3.0 # 半径匹配最大允许半径差值，大于此差值的（实际距圆心距离-com_r最佳半径的点会被截断）
 
 /obstacle_extractor:  # ObstacleExtractor节点命名空间
@@ -41,5 +45,6 @@
 
 /optimal_goal_navigator:  # OptimalGoalNavigator节点命名空间
   ros__parameters:
+    is_dynamic: false  # 是否允许导航动态打断，允许最优点变化
     goal_timeout: 60.0 # 导航超时时间
     max_failures: 20   # 导航最大重试次数
