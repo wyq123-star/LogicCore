@@ -45,7 +45,13 @@ rclcpp_components_register_node(${ImuTransform}
   EXECUTABLE ${ImuTransform}_node
 )
 install(
-  DIRECTORY launch config
+  DIRECTORY launch config 
   DESTINATION share/${PROJECT_NAME}
 )
+
+install(PROGRAMS
+    scripts/slam_riqiang.py
+    DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_auto_package()
