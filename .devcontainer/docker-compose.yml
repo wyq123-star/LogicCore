@@ -1,19 +1,22 @@
 version: '3.9'
 services:
-  visual-service:
-    image: elainasuki/rc2025:visual-2025
-    container_name: visual-container
+  logical_service:
+    image: elainasuki/rc2025:ros2_logical
+    container_name: logical_container_dev
     environment:
       - DISPLAY=${DISPLAY}
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
       - OMP_WAIT_POLICY=passive
       - TERM=xterm-256color
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp # 使用CycloneDDS就取消注释此行
+      - ROS_LOCALHOST_ONLY=1
     volumes:
       # - ${XAUTHORITY}:/root/.Xauthority
       #可以在windows下使用WSL2的X11服务器但是需要在windows环境目录中添加WSL_X11_SOCKET环境变量
+      - /dev:/dev
       - ${WSL_X11_SOCKET:-/tmp/.X11-unix}:/tmp/.X11-unix #如果没有设置WSL_X11_SOCKET则使用默认的/tmp/.X11-unix
-      - ./..:/home/Elaina/visual
+      - logical_volume:/home/Elaina/logical
     network_mode: host
     pid: "host"
     ipc: "host"
@@ -21,14 +24,12 @@ services:
     stdin_open: true
     tty: true
     user: "Elaina"
-    # runtime: "nvidia"
-    working_dir: "/home/Elaina/visual"
-    # profiles:
-    # - build-required
-
-  builder:
-    build:
-      context: .
-    image: elaina/visual
-    profiles:
-      - build-required
+    working_dir: "/home/Elaina/logical"
+volumes:
+  logical_volume:
+    driver: local
+    driver_opts:
+      type: none # 表示直接绑定本地目录
+      device: ./.. # 对应原 ./..（当前 Compose 所在目录的上一级）
+      o: bind # 启用绑定模式，保证双向同步
+    name: logical_volume

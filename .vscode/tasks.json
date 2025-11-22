@@ -60,34 +60,6 @@
         },
         {
             "type": "shell",
-            "label": "ROS2:运行节点",
-            "command": "/bin/bash",
-            "args": [
-                "${workspaceFolder}/.vscode/run.sh",
-                "${input:run_package}",
-                "${input:run_package_node}",
-                "${input:launch_option}"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "group": {
-                "kind": "test",
-                "isDefault": true,
-            },
-            "detail": "不调试运行ROS2节点",
-            "dependsOn": "ROS2:编译整个项目",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            }
-        },
-        {
-            "type": "shell",
             "label": "RunGDBServer",
             "command": "/bin/bash",
             "args": [
@@ -187,27 +159,6 @@
         },
         {
             "type": "shell",
-            "label": "ROS2:编译单个package",
-            "command": "bash",
-            "args": [
-                "-i",
-                "-c",
-                "colcon build --symlink-install --cmake-args -GNinja -DCMAKE_BUILD_TYPE=${input:BuildType} -DCMAKE_EXPORT_COMPILE_COMMANDS=1 --packages-select ${input:build_package}"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "detail": "编译ROS2单个package"
-        },
-        {
-            "type": "shell",
             "label": "ROS2:清理并编译整个项目",
             "command": "bash",
             "args": [
@@ -226,28 +177,6 @@
                 "isDefault": true
             },
             "detail": "清理并编译ROS2项目",
-            "dependsOn": "ROS2:清理"
-        },
-        {
-            "type": "shell",
-            "label": "ROS2:清理并编译单个package",
-            "command": "bash",
-            "args": [
-                "-i",
-                "-c",
-                "colcon build --symlink-install --cmake-args -GNinja -DCMAKE_BUILD_TYPE=${input:BuildType} -DCMAKE_EXPORT_COMPILE_COMMANDS=1 --packages-select ${input:build_package}"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "detail": "清理并编译ROS2单个package",
             "dependsOn": "ROS2:清理"
         },
         {
@@ -272,34 +201,6 @@
             "hide": true,
             "detail": "创建Run程序快捷方式",
             // "dependsOn": "ROS2:编译整个项目"
-        },
-        {
-            "type": "shell",
-            "label": "ROS2:运行launch文件",
-            "command": "/bin/bash",
-            "args": [
-                "${workspaceFolder}/.vscode/launch.sh",
-                "${input:run_package}",
-                "${input:launch_file}",
-                "${input:launch_option}"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "group": {
-                "kind": "test",
-                "isDefault": true
-            },
-            "detail": "不调试运行ROS2 launch文件",
-            "dependsOn": "ROS2:编译整个项目",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            }
         },
     ],
     "inputs": [

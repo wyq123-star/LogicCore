@@ -1,25 +1,27 @@
 {
-    "name": "visual-container",
+    "name": "logical_container",
     "dockerComposeFile": "docker-compose.yml",
-    "service": "visual-service",
-    "workspaceFolder": "/home/Elaina/visual",
+    "service": "logical_service",
+    "workspaceFolder": "/home/Elaina/logical",
     "shutdownAction": "stopCompose",
     "customizations": {
         "vscode": {
             "extensions": [
-                "llvm-vs-code-extensions.vscode-clangd",
                 "twxs.cmake",
                 "josetr.cmake-language-support-vscode",
+                "llvm-vs-code-extensions.vscode-clangd",
                 "ms-vscode.cmake-tools",
                 "cschlosser.doxdocgen",
                 "augustocdias.tasks-shell-input",
                 "ms-vscode.cpptools",
                 "ms-python.python",
-                "ms-iot.vscode-ros",
                 "njpwerner.autodocstring",
                 "vadimcn.vscode-lldb",
                 "llvm-vs-code-extensions.lldb-dap",
-                "github.vscode-github-actions"
+                "ms-python.vscode-pylance",
+                "ms-azuretools.vscode-containers",
+                "mhutchie.git-graph",
+                "donjayamanne.githistory"
             ]
         },
         "jetbrains": {

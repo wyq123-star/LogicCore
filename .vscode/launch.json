@@ -9,12 +9,6 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "Python 调试程序: 使用进程 ID 附加",
-      "type": "debugpy",
-      "request": "attach",
-      "processId": "${command:pickProcess}"
-    },
-    {
       "name": "ROS2:GDB调试",
       "type": "cppdbg",
       "request": "launch",
@@ -67,87 +61,17 @@
       "reverseDebugging": true
     },
     {
-      "name": "ROS2:Launch启动",
-      "type": "ros",
+      "name": "C++ Debugger",
       "request": "launch",
-      "target": "${workspaceFolder}/install/${input:run_package}/share/${input:run_package}/launch/${input:launch_file}",
-      "launch": [
-        "rviz",
-        "gz",
-        "gzserver",
-        "gzclient"
-      ]
-    },
-    {
-      "name": "GDB Launch",
-      "MIMode": "gdb",
       "type": "cppdbg",
-      "request": "attach",
+      "miDebuggerServerAddress": "localhost:3000",
+      "cwd": "/",
       "program": "${workspaceFolder}/.vscode/start_program",
-      "miDebuggerPath": "/usr/bin/gdb"
     },
-    {
-      "name": "C/C++ Runner: Debug Session",
-      "type": "cppdbg",
-      "request": "launch",
-      "args": [],
-      "stopAtEntry": false,
-      "externalConsole": false,
-      "cwd": "/home/tdt/git/new_vision/src/tdt_vision/src/camera",
-      "program": "/home/tdt/git/new_vision/src/tdt_vision/src/camera/build/Debug/outDebug",
-      "MIMode": "gdb",
-      "miDebuggerPath": "gdb",
-      "setupCommands": [
-        {
-          "description": "Enable pretty-printing for gdb",
-          "text": "-enable-pretty-printing",
-          "ignoreFailures": true
-        }
-      ]
-    }
-  ],
-  "inputs": [
-    {
-      "id": "launch_file",
-      "type": "command",
-      "command": "shellCommand.execute",
-      "args": {
-        "command": "ls ./install/${input:run_package}/share/${input:run_package}/launch | grep '.py'",
-        "cwd": "${workspaceFolder}",
-        "env": {
-          "WORKSPACE": "${workspaceFolder[0]}",
-          "FILE": "${file}",
-          "PROJECT": "${workspaceFolderBasename}"
-        }
-      }
-    },
-    {
-      "id": "run_package_node",
-      "type": "command",
-      "command": "shellCommand.execute",
-      "args": {
-        "command": "ls ./install/${input:run_package}/lib/${input:run_package}/",
-        "cwd": "${workspaceFolder}",
-        "env": {
-          "WORKSPACE": "${workspaceFolder[0]}",
-          "FILE": "${file}",
-          "PROJECT": "${workspaceFolderBasename}"
-        }
-      }
-    },
-    {
-      "id": "run_package",
-      "type": "command",
-      "command": "shellCommand.execute",
-      "args": {
-        "command": "ls -F ./install| grep \"/$\" | sed -e 's/\\///g'",
-        "cwd": "${workspaceFolder}",
-        "env": {
-          "WORKSPACE": "${workspaceFolder[0]}",
-          "FILE": "${file}",
-          "PROJECT": "${workspaceFolderBasename}"
-        }
-      }
-    }
+    // {
+    //   "name": "ros Attach",
+    //   "type": "ros2",
+    //   "request": "attach",
+    // }
   ]
 }

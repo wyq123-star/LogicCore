@@ -1,0 +1,71 @@
+version: '3'
+# 定义公共配置（x-开头的扩展字段，可被复用）
+x-common:
+  # 定义别名，用于引用
+  &common
+  environment:
+    - DISPLAY=${DISPLAY}
+    - NVIDIA_VISIBLE_DEVICES=all
+    - NVIDIA_DRIVER_CAPABILITIES=all
+    - OMP_WAIT_POLICY=passive
+    - TERM=xterm-256color
+    - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp # 使用CycloneDDS就取消注释此行
+    - ROS_LOCALHOST_ONLY=1
+  volumes:
+    - /tmp/.X11-unix:/tmp/.X11-unix
+  tty: true
+  network_mode: host
+  pid: "host" # 添加 pid 命名空间共享
+  ipc: "host" # 添加 ipc 命名空间共享    
+  privileged: true
+  stdin_open: true
+services:
+  driver_service:
+    <<: *common # 引用公共配置
+    image: elainasuki/rc2025:ros2_driver
+    container_name: ros2driver_runtime
+    volumes:
+      - ros2_driver_volume:/home/Elaina/ros2_driver
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /dev:/dev
+    user: "Elaina"
+    working_dir: "/home/Elaina/ros2_driver" # 指定默认工作目录
+    entrypoint: [ "/bin/bash", "-i", "-c", " source ~/.bashrc && ros2 launch rc_bringup driver_with_utils.launch.py" ]
+    # entrypoint: [ "/bin/bash" ]
+  logical_service:
+    <<: *common # 引用公共配置
+    image: elainasuki/rc2025:ros2_logical
+    container_name: logical_runtime
+    volumes:
+      - /dev:/dev
+      - logical_volume:/home/Elaina/logical
+    user: "Elaina"
+    working_dir: "/home/Elaina/logical" # 指定默认
+    entrypoint: [ '/bin/bash', '-i', '-c', ' source ~/.bashrc && ros2 run my_perception slam_riqiang.py' ]
+  voxel_service:
+    <<: *common # 引用公共配置
+    image: elainasuki/rc2025:voxel_slam
+    container_name: voxel_slam_runtime
+    volumes:
+      - voxel_map:/home/Elaina/map
+      - voxel_volume:/home/Elaina/slam/
+    user: "Elaina"
+    working_dir: "/home/Elaina/slam/VoxelSlam" # 指定默认工作目录
+    entrypoint: [ "/bin/bash", "-i", "-c", "/home/Elaina/slam/docker_start.sh && source ~/.bashrc && roslaunch my_voxel mid360.launch rviz:=false" ]
+    # 依赖关系，确保 driver_service 先启动
+    depends_on:
+      driver_service:
+        condition: service_started # 条件：driver_service 启动完成（Compose v2.19+ 支持）
+volumes:
+  ros2_driver_volume:
+    external: true
+    name: ros2_driver_volume
+  logical_volume:
+    external: true
+    name: logical_volume
+  voxel_volume:
+    external: true
+    name: voxel_slam_volume
+  voxel_map:
+    external: true
+    name: voxel_map_volume

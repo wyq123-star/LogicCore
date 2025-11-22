@@ -1,3 +1,0 @@
-[submodule "src/slam_docker"]
-	path = src/slam_docker
-	url = https://github.com/njustup70/slam_docker.git

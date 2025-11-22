@@ -1,4 +1,4 @@
-FROM elainasuki/ros:ros2-humble-full-v3
+FROM elainasuki/ros:ros2-humble-full-0614
 
 # 定义用户和用户组
 ARG USERNAME=Elaina
@@ -22,12 +22,8 @@ USER root
 #安装导航依赖
 RUN apt-get update && apt-get install -y ros-humble-nav2-bringup
 RUN echo "source /opt/ros/humble/setup.bash" >> /home/$USERNAME/.bashrc \
-    && echo "export ROS_LOCALHOST_ONLY=1" >> /home/$USERNAME/.bashrc \
-    && echo "export ROS_LOCALHOST_ONLY=1" >> /home/$USERNAME/.config/fish/config.fish \
-    && echo "source ~/visual/install/setup.bash" >> /home/$USERNAME/.bashrc \
-    && echo "source ~/packages/ros_ws/install/setup.bash" >> /home/$USERNAME/.bashrc \
-    && echo "bass source ~/packages/ros_ws/install/setup.bash" >> /home/$USERNAME/.config/fish/config.fish \
-    && echo "bass source ~/visual/install/setup.bash" >> /home/$USERNAME/.config/fish/config.fish 
+    && echo "source ~/logical/install/setup.bash" >> /home/$USERNAME/.bashrc \
+    && echo "bass source ~/logical/install/setup.bash" >> /home/$USERNAME/.config/fish/config.fish 
 
 CMD ["/bin/bash"]
 
