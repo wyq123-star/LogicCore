@@ -313,6 +313,7 @@ class fusion_node_t(Node):
             参数声明：
         """
         data = json.loads(msg.data)
+        
         if 'correct' in data and data['correct'] is True:
                 # 计算Sick数据均值作为真实横向位移
                 real_lateral = sum(self.sick_buffer) / len(self.sick_buffer)

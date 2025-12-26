@@ -148,7 +148,7 @@ async def main_async() -> None:
         serial.write(data.encode())
         await asyncio.sleep(0.05)
 def main():
-    serial = AsyncSerial_t("/dev/serial_qh", 230400)
+    serial = AsyncSerial_t("/dev/ttyACM0", 230400)
     serial.startListening(lambda data: print(f"hex: {data.hex()}"))
     while True:
         serial.write(b"Hello from AsyncSerial_t!\n")

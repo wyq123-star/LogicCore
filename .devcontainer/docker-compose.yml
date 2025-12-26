@@ -1,7 +1,8 @@
 version: '3.9'
+
 services:
   logical_service:
-    image: elainasuki/rc2025:ros2_logical
+    image: elainasuki/rc2026:ros2_logical
     container_name: logical_container_dev
     environment:
       - DISPLAY=${DISPLAY}
