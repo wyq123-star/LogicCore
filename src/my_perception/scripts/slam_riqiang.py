@@ -7,8 +7,9 @@ import json,os,math,numpy as np
 import rclpy.time
 from std_msgs.msg import String
 from itertools import product
-from nav_msgs.msg import Odometry
-from tf2_ros import TransformBroadcaster, TransformListener, Buffer,StaticTransformBroadcaster
+from tf2_ros import TransformBroadcaster, TransformListener, Buffer
+from collections import deque
+
 class fusion_node_t(Node):
     def __init__(self):
         super().__init__('fusion_node')
@@ -17,14 +18,16 @@ class fusion_node_t(Node):
         self.declare_parameter('slam_odom',['camera_init']) # 被监听的tf地图坐标 
         self.declare_parameter('slam_base_link',['body','aft_mapped'])  # 被监听的tf基座坐标
         self.declare_parameter('odom_topic','/odom')   #轮式里程计
-        self.declare_parameter('base_to_laser', [0.085,0.095, 0.0])  # 激光雷达到base_link的偏移 右手系
+        self.declare_parameter('laser_to_base', [0.085,0.095, 0.0])  # 激光雷达到base_link的偏移 右手系
         self.declare_parameter('riqiang_y', -0.10975) #日墙时候的雷达y偏移
         self.declare_parameter('slam_to_map',[0.46876+0.26775,-0.08475-0.0815,0.0])
+        self.declare_parameter('debug', False)
+        self.debug = self.get_parameter('debug').value
         self.odom_topic = self.get_parameter('odom_topic').value
         self.odom_frame = self.get_parameter('odom_frame').value #轮式里程计坐标
         self.base_frame = self.get_parameter('base_frame').value #发布的base_link坐标
         self.slam_to_map = self.get_parameter('slam_to_map').value
-        self.base_to_laser = self.get_parameter('base_to_laser').value  # [x_offset, y_offset, yaw_offset]
+        self.laser_to_base = self.get_parameter('laser_to_base').value  # [x_offset, y_offset, yaw_offset]
         self.slam_odom = self.get_parameter('slam_odom').value  #被监听的tf地图坐标
         self.slam_base_link = self.get_parameter('slam_base_link').value  #被监听
         
@@ -36,6 +39,9 @@ class fusion_node_t(Node):
         self.slam_x = 0.0
         self.slam_y = 0.0
         self.slam_yaw = 0.0
+        self.latest_slam_time = None
+        self.latest_matched_odom = None
+        self.odom_buffer = deque(maxlen=500) 
 
         self.odom_x=0.0
         self.odom_y=0.0
@@ -43,15 +49,15 @@ class fusion_node_t(Node):
 
         self.base_link_x=0.0
         self.base_link_y=0.0
-        self.r = math.sqrt(self.base_to_laser[0]**2 + self.base_to_laser[1]**2)
-        self.laser_angle = math.atan2(self.base_to_laser[1], self.base_to_laser[0])
+        self.r = math.sqrt(self.laser_to_base[0]**2 + self.laser_to_base[1]**2)
+        self.laser_angle = math.atan2(self.laser_to_base[1], self.laser_to_base[0])
 
         self.x_diff,self.y_diff,self.yaw_diff = 0.0,0.0,0.0
 
         #两个定时器回调和两个订阅者回调
         self.fuse_timer = self.create_timer(0.1,self.fuse_callback)
         self.slam_timer = self.create_timer(0.01,self.slam_tf_callback)
-        self.odom_callback_sub= self.create_subscription(Vector3Stamped, self.odom_topic, self.odom_callback, 1)
+        self.odom_callback_sub= self.create_subscription(Vector3Stamped, self.odom_topic, self.odom_callback, 50)
         self.odom_pub= self.create_publisher(Vector3Stamped, 'base_link_odom', 10)
         self.robot_sub= self.create_subscription(String, 'robot_state', self.robot_state_callback, 1)
 
@@ -77,12 +83,16 @@ class fusion_node_t(Node):
                 return
 
         try:
-            # 原始坐标
+                        # 直接提取原始TF时间戳
+            original_stamp = transform.header.stamp
+            self.latest_slam_time = rclpy.time.Time.from_msg(original_stamp)
+
             original_x = transform.transform.translation.x
             original_y = transform.transform.translation.y
             original_z = transform.transform.translation.z
-            self.slam_x = original_y*math.sin(self.base_to_laser[2]) + original_x*math.cos(self.base_to_laser[2])
-            self.slam_y = original_y*math.cos(self.base_to_laser[2]) - original_x*math.sin(self.base_to_laser[2])
+
+            self.slam_x = original_y*math.sin(self.laser_to_base[2]) + original_x*math.cos(self.laser_to_base[2])
+            self.slam_y = original_y*math.cos(self.laser_to_base[2]) - original_x*math.sin(self.laser_to_base[2])
             # 处理姿态（四元数转偏航角）
             orientation = transform.transform.rotation
             siny_cosp = 2.0 * (orientation.w * orientation.z + orientation.x * orientation.y)
@@ -90,7 +100,7 @@ class fusion_node_t(Node):
             original_yaw = math.atan2(siny_cosp, cosy_cosp)
             
             # 应用旋转角度到偏航角（将角度转换为弧度）
-            rotation_rad = math.radians(self.base_to_laser[2])
+            rotation_rad = math.radians(self.laser_to_base[2])
             self.slam_yaw = rotation_rad + original_yaw
             
             # 规范化偏航角到[-π, π]范围
@@ -117,22 +127,63 @@ class fusion_node_t(Node):
             return
 
     def odom_callback(self,msg:Vector3Stamped):
+        stamp = rclpy.time.Time.from_msg(msg.header.stamp)
+        # print(f'{stamp}') # 获取odom话题的原始时间戳
+        odom_data = {
+            'stamp': stamp,
+            'x': msg.vector.x,
+            'y': msg.vector.y,
+            'yaw': msg.vector.z
+        }
+        self.odom_buffer.append(odom_data)
+
         self.odom_x = msg.vector.x
         self.odom_y = msg.vector.y
         self.odom_yaw = msg.vector.z
         self.tf_publish(self.odom_frame, self.base_frame, self.odom_x, self.odom_y, self.odom_yaw)
 
     def fuse_callback(self):
-        dyaw= self.slam_yaw - self.odom_yaw
+        if self.latest_slam_time is None:
+            return
+        
+        matched_odom = self.get_odom_by_time(self.latest_slam_time)
+        if matched_odom is None:
+            return
+        if(self.debug == True):
+            print(f'{self.latest_slam_time}')
+            print(f'{matched_odom}')
+            
+        odom_x = matched_odom['x']
+        odom_y = matched_odom['y']
+        odom_yaw = matched_odom['yaw']
+
+        dyaw= self.slam_yaw - odom_yaw
         if dyaw > math.pi:
             dyaw -= 2 * math.pi
         elif dyaw < -math.pi:
             dyaw += 2 * math.pi
-        self.base_link_x=self.slam_x - self.r*math.sin(self.laser_angle + self.slam_yaw) +self.base_to_laser[1]
-        self.base_link_y=self.slam_y + self.r*math.cos(self.laser_angle + self.slam_yaw) -self.base_to_laser[0]
-        self.x_diff= self.base_link_x-(self.odom_x*math.cos(dyaw)-self.odom_y*math.sin(dyaw)) 
-        self.y_diff= self.base_link_y-(self.odom_x*math.sin(dyaw)+self.odom_y*math.cos(dyaw))
+        self.base_link_x=self.slam_x - self.r*math.sin(self.laser_angle + self.slam_yaw) +self.laser_to_base[1]
+        self.base_link_y=self.slam_y + self.r*math.cos(self.laser_angle + self.slam_yaw) -self.laser_to_base[0]
+
+        self.x_diff= self.base_link_x-(odom_x*math.cos(dyaw)-odom_y*math.sin(dyaw)) 
+        self.y_diff= self.base_link_y-(odom_x*math.sin(dyaw)+odom_y*math.cos(dyaw))
         self.yaw_diff=dyaw    
+
+    def get_odom_by_time(self, target_time: rclpy.time.Time):
+        if target_time is None or len(self.odom_buffer) == 0:
+            return None
+        
+        if(self.debug == True):
+            print("---- last 50 odom ----")
+            for o in list(self.odom_buffer)[-50:]:
+                print(o['stamp'].nanoseconds, o['x'], o['y'], o['yaw'])
+            print("---- end ----")
+
+        return min(
+            self.odom_buffer,
+            key=lambda o: abs((o['stamp'] - target_time).nanoseconds)
+        )
+
 
        
     def robot_state_callback(self, msg: String):
